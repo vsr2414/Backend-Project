@@ -1,15 +1,45 @@
 const React = require("react");
+const { ApiClient } = require("adminjs");
+
+const api = new ApiClient();
 
 const DashboardPage = (props) => {
-  const dashboardData = props.data || {};
+  const [dashboardData, setDashboardData] = React.useState({});
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      try {
+        const response = await api.getDashboard();
+        if (!cancelled) {
+          setDashboardData((response && response.data) || {});
+          setError("");
+        }
+      } catch (_error) {
+        if (!cancelled) {
+          setError("Unable to load dashboard data.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const summary = dashboardData.summary || {};
   const user = dashboardData.user || {};
   const recentOrders = dashboardData.recentOrders || [];
   const isAdminDashboard = dashboardData.role === "admin";
-
-  const openAdminPage = (path) => {
-    window.location.href = path;
-  };
 
   const wrapperStyle = {
     padding: "36px",
@@ -68,7 +98,13 @@ const DashboardPage = (props) => {
       style: wrapperStyle,
     },
     React.createElement("h1", { style: headingStyle }, dashboardData.role === "admin" ? "Admin Dashboard" : "My Dashboard"),
-    isAdminDashboard
+    isLoading
+      ? React.createElement("p", { style: { margin: 0, color: "#4b5563" } }, "Loading dashboard...")
+      : null,
+    error
+      ? React.createElement("p", { style: { margin: 0, color: "#b91c1c", fontWeight: 600 } }, error)
+      : null,
+    !isLoading && !error && isAdminDashboard
       ? React.createElement(
           "div",
           { style: cardsStyle },
@@ -143,7 +179,8 @@ const DashboardPage = (props) => {
             )
           )
         )
-      : React.createElement(
+      : !isLoading && !error
+        ? React.createElement(
           "div",
           { style: { display: "grid", gap: "12px" } },
           React.createElement(
@@ -194,7 +231,8 @@ const DashboardPage = (props) => {
                   )
                 )
           )
-        ));
+        )
+        : null);
 };
 
 module.exports = DashboardPage;

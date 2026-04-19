@@ -269,6 +269,22 @@ const seedInitialData = async () => {
   }
 };
 
+const ensureInitialized = (() => {
+  let initPromise;
+
+  return async () => {
+    if (!initPromise) {
+      initPromise = (async () => {
+        await sequelize.authenticate();
+        await sequelize.sync();
+        await seedInitialData();
+      })();
+    }
+
+    return initPromise;
+  };
+})();
+
 const admin = new AdminJS({
   rootPath: "/admin",
   resources: [
@@ -727,9 +743,7 @@ app.get("/", async (_req, res) => {
 
 const start = async () => {
   try {
-    await sequelize.authenticate();
-    await sequelize.sync();
-    await seedInitialData();
+    await ensureInitialized();
 
     const port = Number(process.env.PORT || 3000);
     app.listen(port, () => {
@@ -741,4 +755,11 @@ const start = async () => {
   }
 };
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = {
+  app,
+  ensureInitialized,
+};
