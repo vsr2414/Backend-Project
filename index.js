@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const path = require("path");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -58,6 +59,8 @@ const requireEnv = (name) => {
 const sessionSecret = requireEnv("SESSION_SECRET");
 const jwtSecret = requireEnv("JWT_SECRET");
 const adminCookieSecret = requireEnv("ADMIN_COOKIE_SECRET");
+const dashboardPageComponent = path.join(__dirname, "admin", "dashboard-page.js");
+const settingsPageComponent = path.join(__dirname, "admin", "settings-page.js");
 
 app.use(
   session({
@@ -478,7 +481,7 @@ const admin = new AdminJS({
         recentOrders: serializedOrders,
       };
     },
-    component: AdminJS.bundle("./admin/dashboard-page"),
+    component: AdminJS.bundle(dashboardPageComponent),
   },
   pages: {
     customSettings: {
@@ -521,7 +524,7 @@ const admin = new AdminJS({
           message,
         };
       },
-      component: AdminJS.bundle("./admin/settings-page"),
+      component: AdminJS.bundle(settingsPageComponent),
       isAccessible: ({ currentAdmin }) => currentAdmin?.role === "admin",
       isVisible: ({ currentAdmin }) => currentAdmin?.role === "admin",
     },
