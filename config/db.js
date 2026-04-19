@@ -1,4 +1,5 @@
 const { Sequelize } = require("sequelize");
+const pg = require("pg");
 
 const requireEnv = (name) => {
   const value = process.env[name];
@@ -12,6 +13,7 @@ const requireEnv = (name) => {
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {
       dialect: "postgres",
+      dialectModule: pg,
       logging: false,
     })
   : new Sequelize(
@@ -22,6 +24,7 @@ const sequelize = process.env.DATABASE_URL
         host: process.env.DB_HOST || "localhost",
         port: Number(process.env.DB_PORT || 5432),
         dialect: "postgres",
+        dialectModule: pg,
         logging: false,
       }
     );
