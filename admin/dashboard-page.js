@@ -1,46 +1,7 @@
 const React = require("react");
 
 const DashboardPage = (props) => {
-  const [data, setData] = React.useState(props.data || null);
-  const [isLoading, setIsLoading] = React.useState(!props.data);
-  const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const loadDashboard = async () => {
-      try {
-        const response = await fetch("/admin/api/dashboard", {
-          credentials: "same-origin",
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to load dashboard data");
-        }
-
-        const json = await response.json();
-        if (!cancelled) {
-          setData(json || {});
-        }
-      } catch (_err) {
-        if (!cancelled) {
-          setError("Unable to load dashboard data.");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const dashboardData = data || {};
+  const dashboardData = props.data || {};
   const summary = dashboardData.summary || {};
   const user = dashboardData.user || {};
   const recentOrders = dashboardData.recentOrders || [];
@@ -107,13 +68,7 @@ const DashboardPage = (props) => {
       style: wrapperStyle,
     },
     React.createElement("h1", { style: headingStyle }, dashboardData.role === "admin" ? "Admin Dashboard" : "My Dashboard"),
-    isLoading
-      ? React.createElement("p", { style: { margin: 0, color: "#4b5563" } }, "Loading dashboard...")
-      : null,
-    error
-      ? React.createElement("p", { style: { margin: 0, color: "#b91c1c", fontWeight: 600 } }, error)
-      : null,
-    !isLoading && !error && isAdminDashboard
+    isAdminDashboard
       ? React.createElement(
           "div",
           { style: cardsStyle },
@@ -188,28 +143,26 @@ const DashboardPage = (props) => {
             )
           )
         )
-      : !isLoading && !error
-        ? React.createElement(
+      : React.createElement(
           "div",
           { style: { display: "grid", gap: "12px" } },
           React.createElement(
             "div",
             { style: sectionStyle },
-              React.createElement("h2", { style: { marginTop: 0, fontSize: "26px" } }, "Profile"),
+            React.createElement("h2", { style: { marginTop: 0, fontSize: "26px" } }, "Profile"),
             React.createElement("p", null, `Name: ${user.name || "-"}`),
             React.createElement("p", { style: { marginBottom: 0 } }, `Email: ${user.email || "-"}`)
           ),
-            React.createElement("h2", { style: { marginBottom: 0, fontSize: "26px" } }, "Recent Orders"),
+          React.createElement("h2", { style: { marginBottom: 0, fontSize: "26px" } }, "Recent Orders"),
           React.createElement(
             "div",
             { style: sectionStyle },
             recentOrders.length === 0
-              ?
-              React.createElement(
-                "p",
-                { style: { margin: 0 } },
-                "No recent orders found."
-              )
+              ? React.createElement(
+                  "p",
+                  { style: { margin: 0 } },
+                  "No recent orders found."
+                )
               : React.createElement(
                   "table",
                   { style: { width: "100%", borderCollapse: "collapse" } },
@@ -240,10 +193,8 @@ const DashboardPage = (props) => {
                     )
                   )
                 )
-              )
           )
-          : null
-        );
+        ));
 };
 
 module.exports = DashboardPage;

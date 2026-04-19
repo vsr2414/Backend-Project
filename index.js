@@ -74,6 +74,73 @@ app.use(
 
 const isValidSettingKey = (key) => /^[a-z][a-z0-9_\-\s]{1,63}$/i.test(key) && /[a-z]/i.test(key);
 
+const parseCookies = (cookieHeader = "") =>
+  cookieHeader.split(";").reduce((cookies, pair) => {
+    const separatorIndex = pair.indexOf("=");
+    if (separatorIndex === -1) {
+      return cookies;
+    }
+
+    const key = pair.slice(0, separatorIndex).trim();
+    const value = pair.slice(separatorIndex + 1).trim();
+
+    if (key) {
+      cookies[key] = decodeURIComponent(value);
+    }
+
+    return cookies;
+  }, {});
+
+const getRequestToken = (req) => {
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+
+  const cookies = parseCookies(req.headers.cookie || "");
+  return cookies.admin_token || null;
+};
+
+const getAuthenticatedUserFromRequest = async (req) => {
+  const token = getRequestToken(req);
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = jwt.verify(token, jwtSecret);
+    const user = await User.findByPk(payload.id, {
+      attributes: ["id", "name", "email", "role"],
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return user;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const hydrateAdminSessionFromJwt = async (req, _res, next) => {
+  if (!req.session?.currentAdmin) {
+    const user = await getAuthenticatedUserFromRequest(req);
+
+    if (user) {
+      req.session.currentAdmin = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      };
+    }
+  }
+
+  next();
+};
+
 const authenticateApiUser = async (email, password) => {
   const user = await User.findOne({ where: { email } });
 
@@ -307,7 +374,11 @@ const admin = new AdminJS({
       options: {
         titleProperty: "id",
         navigation: "Sales",
-        properties: {},
+        properties: {
+          userId: {
+            reference: "Users",
+          },
+        },
         listProperties: ["id", "status", "totalAmount", "userId", "createdAt"],
         showProperties: ["id", "status", "totalAmount", "userId", "createdAt", "updatedAt"],
         editProperties: ["status", "totalAmount", "userId"],
@@ -468,7 +539,7 @@ const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
   }
 );
 
-app.use(admin.options.rootPath, adminRouter);
+app.use(admin.options.rootPath, hydrateAdminSessionFromJwt, adminRouter);
 
 app.get("/admin/pages/settings", (_req, res) => {
   return res.redirect("/admin/pages/customSettings");
@@ -592,6 +663,13 @@ app.post("/api/login", async (req, res) => {
       role: user.role,
     };
 
+    res.cookie("admin_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
     return res.json({
       token,
       user: {
@@ -608,23 +686,13 @@ app.post("/api/login", async (req, res) => {
 
 app.get("/api/me", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const user = await getAuthenticatedUserFromRequest(req);
 
-    if (!token) {
+    if (!user) {
       return res.status(401).json({ message: "Missing token" });
     }
 
-    const payload = jwt.verify(token, jwtSecret);
-    const user = await User.findByPk(payload.id, {
-      attributes: { exclude: ["password"] },
-    });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    return res.json(user);
+    return res.json(await User.findByPk(user.id, { attributes: { exclude: ["password"] } }));
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });
   }
@@ -632,16 +700,13 @@ app.get("/api/me", async (req, res) => {
 
 app.get("/api/summary", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const user = await getAuthenticatedUserFromRequest(req);
 
-    if (!token) {
+    if (!user) {
       return res.status(401).json({ message: "Missing token" });
     }
 
-    const payload = jwt.verify(token, jwtSecret);
-
-    if (payload.role !== "admin") {
+    if (user.role !== "admin") {
       return res.status(403).json({ message: "Admin access only" });
     }
 
