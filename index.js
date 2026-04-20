@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const path = require("path");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
@@ -59,6 +60,10 @@ const requireEnv = (name) => {
 const sessionSecret = requireEnv("SESSION_SECRET");
 const jwtSecret = requireEnv("JWT_SECRET");
 const adminCookieSecret = requireEnv("ADMIN_COOKIE_SECRET");
+
+// Cookie parser MUST use the same secret as AdminJS for signed cookies
+app.use(cookieParser(adminCookieSecret));
+
 const dashboardPageComponent = path.join(__dirname, "admin", "dashboard-page.js");
 const settingsPageComponent = path.join(__dirname, "admin", "settings-page.js");
 
@@ -536,11 +541,9 @@ const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
   {
     authenticate: async (email, password) => {
       const user = await authenticateApiUser(email, password);
-
       if (!user) {
         return null;
       }
-
       return {
         id: user.id,
         email: user.email,
@@ -553,8 +556,15 @@ const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
   },
   null,
   {
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
   }
 );
 
