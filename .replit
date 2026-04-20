@@ -1,0 +1,12 @@
+run = "npm start"
+modules = ["nodejs-20"]
+
+[nix]
+channel = "unstable"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
